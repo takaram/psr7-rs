@@ -1,0 +1,11 @@
+{
+    "require": {
+        "psr/http-message": "^2.0"
+    },
+    "require-dev": {
+        "php-http/psr7-integration-tests": "^1.3"
+    },
+    "provide": {
+        "psr/http-message-implementation": "2.0"
+    }
+}
