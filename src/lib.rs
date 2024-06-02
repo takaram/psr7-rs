@@ -1,14 +1,11 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#![cfg_attr(windows, feature(abi_vectorcall))]
+use crate::class::uri::Uri;
+use ext_php_rs::prelude::*;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod class;
+mod util;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[php_module]
+pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
+    module
 }

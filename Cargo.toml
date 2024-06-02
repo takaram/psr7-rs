@@ -8,6 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ext-php-rs = "*"
+http = "1.0.0"
 
 [profile.release]
 strip = "debuginfo"
