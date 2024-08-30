@@ -1,13 +1,16 @@
 use crate::util::invalid_argument_exception;
 use ext_php_rs::prelude::*;
-use http::uri::{Authority, PathAndQuery, Scheme};
+use http::uri::Authority;
 
 #[php_class(name = "Takaram\\Psr7\\Internal\\Uri")]
 pub struct Uri {
-    scheme: Option<Scheme>,
-    authority: Option<Authority>,
-    path_and_query: Option<PathAndQuery>,
-    fragment: Option<String>,
+    scheme: String,
+    user_info: String,
+    host: String,
+    port: Option<u16>,
+    path: String,
+    query: String,
+    fragment: String,
 }
 
 impl Uri {
@@ -16,12 +19,22 @@ impl Uri {
         str.parse::<http::Uri>()
             .map_err(|_| format!("Failed to parse URI: {str}", str = str.clone()))
             .map(|uri| {
-                let parts = uri.into_parts();
+                let authority = uri.authority().map_or("", Authority::as_str);
+                let user_info = authority
+                    .find('@')
+                    .map_or("", |pos| &authority[..pos])
+                    .to_string();
                 Self {
-                    scheme: parts.scheme,
-                    authority: parts.authority,
-                    path_and_query: parts.path_and_query,
-                    fragment: str.find('#').map(|pos| String::from(&str[(pos + 1)..])),
+                    scheme: uri.scheme_str().unwrap_or("").to_string(),
+                    user_info,
+                    host: uri.authority().map_or("", Authority::host).to_string(),
+                    port: uri.authority().and_then(Authority::port_u16),
+                    path: uri.path().to_string(),
+                    query: uri.query().unwrap_or("").to_string(),
+                    fragment: str
+                        .find('#')
+                        .map_or("", |pos| &str[(pos + 1)..])
+                        .to_string(),
                 }
             })
     }
@@ -34,92 +47,65 @@ impl Uri {
     }
 
     pub fn get_scheme(&self) -> String {
-        self.scheme
-            .as_ref()
-            .map_or_else(|| "".to_string(), |scheme| scheme.as_str().to_lowercase())
+        self.scheme.clone()
     }
 
     pub fn get_authority(&self) -> String {
-        self.authority
-            .as_ref()
-            .map(Authority::as_str)
-            .unwrap_or("")
-            .to_string()
+        let mut result = "".to_string();
+        if self.user_info != "" {
+            result.push_str(&self.user_info);
+            result.push('@');
+        }
+        result.push_str(&self.host);
+        if let Some(port) = self.port {
+            result.push(':');
+            result.push_str(&port.to_string());
+        }
+        result
     }
 
     pub fn get_user_info(&self) -> String {
-        let Some(authority) = self.authority.as_ref().map(Authority::as_str) else {
-            return "".to_string();
-        };
-        let Some(at_pos) = authority.find('@') else {
-            return "".to_string();
-        };
-        String::from(&authority[..at_pos])
+        self.user_info.clone()
     }
 
     pub fn get_host(&self) -> String {
-        self.authority
-            .as_ref()
-            .map_or("", Authority::host)
-            .to_string()
+        self.host.clone()
     }
 
     pub fn get_port(&self) -> Option<u16> {
-        self.authority
-            .as_ref()
-            .and_then(Authority::port_u16)
-            .or_else(|| match self.scheme.as_ref().map(|s| s.as_str())? {
-                "http" => Some(80),
-                "https" => Some(443),
-                _ => None,
-            })
+        self.port.or_else(|| match self.scheme.as_ref() {
+            "http" => Some(80),
+            "https" => Some(443),
+            _ => None,
+        })
     }
 
     pub fn get_path(&self) -> String {
-        self.path_and_query
-            .as_ref()
-            .map_or("", PathAndQuery::path)
-            .to_string()
+        self.path.clone()
     }
 
     pub fn get_query(&self) -> String {
-        self.path_and_query
-            .as_ref()
-            .and_then(PathAndQuery::query)
-            .unwrap_or("")
-            .to_string()
+        self.query.clone()
     }
 
     pub fn get_fragment(&self) -> String {
-        self.fragment.clone().unwrap_or_else(|| "".to_string())
+        self.fragment.clone()
     }
 
     #[rename("__toString")]
     pub fn to_string(&self) -> String {
-        let scheme = self.scheme.as_ref().map(Scheme::as_str);
-        let authority = self.authority.as_ref().map(Authority::as_str);
-        let path_and_query = self.path_and_query.as_ref().map(PathAndQuery::as_str);
-
-        let mut result = scheme.map_or_else(
-            || {
-                format!(
-                    "{}{}",
-                    authority.unwrap_or(""),
-                    path_and_query.unwrap_or("")
-                )
-            },
-            |scheme| {
-                format!(
-                    "{}://{}{}",
-                    scheme,
-                    authority.unwrap_or(""),
-                    path_and_query.unwrap_or("")
-                )
-            },
-        );
-        if let Some(frag) = &self.fragment {
+        let mut result = if self.scheme == "" {
+            format!("{}{}", self.get_authority(), self.path)
+        } else {
+            format!("{}://{}{}", self.scheme, self.get_authority(), self.path)
+        };
+        if self.query != "" {
+            result.push('?');
+            result.push_str(&self.query);
+        }
+        if self.fragment != "" {
             result.push('#');
-            result.push_str(&frag);
+            result.push_str(&self.fragment);
         }
 
         result
