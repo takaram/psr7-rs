@@ -38,6 +38,26 @@ impl Uri {
                 }
             })
     }
+
+    fn _with_port(&self, port: Option<i64>) -> Result<Self, &str> {
+        let port = match port {
+            None => None,
+            Some(num) => {
+                let n: u16 = num.try_into().map_err(|_| "Invalid value for port")?;
+                Some(n)
+            }
+        };
+
+        Ok(Self {
+            scheme: self.scheme.clone(),
+            user_info: self.user_info.clone(),
+            host: self.host.clone(),
+            port,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        })
+    }
 }
 
 #[php_impl]
@@ -109,6 +129,87 @@ impl Uri {
         }
 
         result
+    }
+
+    pub fn with_scheme(&self, scheme: &str) -> Self {
+        Self {
+            scheme: scheme.to_lowercase(),
+            user_info: self.user_info.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn with_user_info(&self, user: &str, password: Option<&str>) -> Self {
+        // TODO: escape user_info
+        let user_info =
+            password.map_or_else(|| user.to_string(), |pass| format!("{}:{}", user, pass));
+
+        Self {
+            scheme: self.scheme.clone(),
+            user_info,
+            host: self.host.clone(),
+            port: self.port,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn with_host(&self, host: &str) -> Self {
+        Self {
+            scheme: self.scheme.clone(),
+            user_info: self.user_info.clone(),
+            host: host.into(),
+            port: self.port,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn with_port(&self, port: Option<i64>) -> PhpResult<Self> {
+        self._with_port(port)
+            .map_err(|err| PhpException::new(err.into(), 0, invalid_argument_exception()))
+    }
+
+    pub fn with_path(&self, path: &str) -> Self {
+        Self {
+            scheme: self.scheme.clone(),
+            user_info: self.user_info.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            path: path.into(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn with_query(&self, query: &str) -> Self {
+        Self {
+            scheme: self.scheme.clone(),
+            user_info: self.user_info.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            path: self.path.clone(),
+            query: query.into(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn with_fragment(&self, fragment: &str) -> Self {
+        Self {
+            scheme: self.scheme.clone(),
+            user_info: self.user_info.clone(),
+            host: self.host.clone(),
+            port: self.port,
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: fragment.into(),
+        }
     }
 }
 
@@ -281,5 +382,92 @@ mod tests {
 
         let uri = Uri::new("/path#baz").unwrap();
         assert_eq!(uri.to_string(), "/path#baz");
+    }
+
+    #[test]
+    fn with_scheme() {
+        let uri = Uri::new("http://example.com/").unwrap();
+        let uri = uri.with_scheme("https");
+        assert_eq!(uri.get_scheme(), "https");
+    }
+
+    #[test]
+    fn with_scheme_case_insensitive() {
+        let uri = Uri::new("http://example.com/").unwrap();
+        let uri = uri.with_scheme("HTTPS");
+        assert_eq!(uri.get_scheme(), "https");
+    }
+
+    #[test]
+    fn with_scheme_empty() {
+        let uri = Uri::new("http://example.com/").unwrap();
+        let uri = uri.with_scheme("");
+        assert_eq!(uri.get_scheme(), "");
+    }
+
+    #[test]
+    fn with_user_info() {
+        let uri = Uri::new("http://user:pass@example.com/").unwrap();
+        let uri = uri.with_user_info("new_user", Some("foo"));
+        assert_eq!(uri.get_authority(), "new_user:foo@example.com");
+    }
+
+    #[test]
+    fn with_user_info_no_password() {
+        let uri = Uri::new("http://user:pass@example.com/").unwrap();
+        let uri = uri.with_user_info("new_user", None);
+        assert_eq!(uri.get_authority(), "new_user@example.com");
+    }
+
+    #[test]
+    fn with_user_info_empty() {
+        let uri = Uri::new("http://user:pass@example.com/").unwrap();
+        let uri = uri.with_user_info("", None);
+        assert_eq!(uri.get_authority(), "example.com");
+    }
+
+    #[test]
+    fn with_port() {
+        let uri = Uri::new("http://example.com/").unwrap();
+        let uri = uri._with_port(Some(8000)).unwrap();
+        assert_eq!(uri.get_authority(), "example.com:8000");
+    }
+
+    #[test]
+    fn with_port_none() {
+        let uri = Uri::new("http://example.com:8000/").unwrap();
+        let uri = uri._with_port(None).unwrap();
+        assert_eq!(uri.get_authority(), "example.com");
+    }
+
+    #[test]
+    fn with_port_out_of_range() {
+        let uri = Uri::new("http://example.com:8000/").unwrap();
+        let result = uri._with_port(Some(-1));
+        assert!(result.is_err());
+
+        let result = uri._with_port(Some(65536));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_path() {
+        let uri = Uri::new("http://example.com/foo").unwrap();
+        let uri = uri.with_path("/bar");
+        assert_eq!(uri.get_path(), "/bar");
+    }
+
+    #[test]
+    fn with_query() {
+        let uri = Uri::new("http://example.com/foo").unwrap();
+        let uri = uri.with_query("foo=bar");
+        assert_eq!(uri.get_query(), "foo=bar");
+    }
+
+    #[test]
+    fn with_fragment() {
+        let uri = Uri::new("http://example.com/foo").unwrap();
+        let uri = uri.with_fragment("bar");
+        assert_eq!(uri.get_fragment(), "bar");
     }
 }
