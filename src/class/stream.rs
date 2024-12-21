@@ -5,6 +5,8 @@ use ext_php_rs::error::Error;
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 
 #[php_class(name = "Takaram\\Psr7\\Internal\\VecStream")]
 #[derive(Default, Debug)]
@@ -27,6 +29,21 @@ impl VecStream {
             body: Vec::from(str),
             pos: 0,
         }
+    }
+
+    pub fn from_file(file_name: &str) -> Result<Self, std::io::Error> {
+        let mut file = File::open(file_name)?;
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf)?;
+
+        Ok(Self {
+            body: buf,
+            pos: 0,
+        })
+    }
+
+    pub fn get_body(&self) -> &[u8] {
+        &self.body
     }
 }
 

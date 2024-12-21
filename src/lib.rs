@@ -2,10 +2,12 @@
 use ext_php_rs::binary::Binary;
 use ext_php_rs::binary_slice::BinarySlice;
 use ext_php_rs::prelude::*;
+use ext_php_rs::types::ZendClassObject;
 use ext_php_rs::types::Zval;
 
 use crate::class::stream::VecStream;
 use crate::class::uri::Uri;
+use crate::class::uploaded_file::UploadedFile;
 
 mod class;
 mod util;
