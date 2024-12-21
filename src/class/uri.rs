@@ -77,7 +77,7 @@ impl Uri {
             result.push('@');
         }
         result.push_str(&self.host);
-        if let Some(port) = self.port {
+        if let Some(port) = self.get_port() {
             result.push(':');
             result.push_str(&port.to_string());
         }
@@ -89,15 +89,20 @@ impl Uri {
     }
 
     pub fn get_host(&self) -> String {
-        self.host.clone()
+        self.host.to_lowercase()
     }
 
     pub fn get_port(&self) -> Option<u16> {
-        self.port.or_else(|| match self.scheme.as_ref() {
+        let default_port = match self.scheme.as_ref() {
             "http" => Some(80),
             "https" => Some(443),
             _ => None,
-        })
+        };
+        if self.port == default_port {
+            None
+        } else {
+            self.port
+        }
     }
 
     pub fn get_path(&self) -> String {
