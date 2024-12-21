@@ -1,4 +1,9 @@
 {
+    "autoload": {
+        "psr-4": {
+            "Takaram\\Psr7\\": "php/"
+        }
+    },
     "require": {
         "php": "^8.2",
         "psr/http-message": "^2.0"
